@@ -1,0 +1,4 @@
+topology,element_id,from_node,to_node,direction,type_override,cd_override,area_override_mm2
+*,E1,Shaft,ChamberA,Compression,,,
+*,E2,ChamberA,Reservoir,Compression,,,
+*,E3,ChamberB,Reservoir,Bidirectional,Bleed,,

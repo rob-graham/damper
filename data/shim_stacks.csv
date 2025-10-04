@@ -1,0 +1,4 @@
+code,description,stack_rate_n_per_mm
+SS-STD,Baseline linear stack,52
+SS-DIG,Digressive rebound stack,48
+SS-HSC,High-speed compression stack,60

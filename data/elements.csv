@@ -1,0 +1,4 @@
+element_id,type,cd,area_mm2
+E1,Compression,0.62,25
+E2,Compression,0.68,15
+E3,Bleed,0.54,0.30

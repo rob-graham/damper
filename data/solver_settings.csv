@@ -1,0 +1,6 @@
+name,value
+MinVelocity,0.0
+MaxVelocity,0.6
+Step,0.1
+Direction,Compression
+Topology,Fork_OpenCartridge

@@ -1,0 +1,13 @@
+name,value
+Ap,3.2
+Ar,3.0
+OilDensity,860
+ShaftPressure,12.4
+ReservoirPressure,11.7
+Temperature,40
+ClickSetting,8
+ShimStack,SS-STD
+TravelPosition,0.35
+VelocityTarget,0.2
+RemoteCd,0.55
+RemoteArea_mm2,0.45

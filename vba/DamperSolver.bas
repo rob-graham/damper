@@ -135,14 +135,15 @@ Public Function SolveDamper(direction As String, v As Double, x As Double, topoN
         End If
     Next nodeKey
 
+    Dim evaluation As Object
     If countUnknown = 0 Then
-        SolveDamper = nodes
+        Set evaluation = EvaluateNetwork(unknownNames, unknownValues, nodes, fixedNodes, cfg, rho, mu, dirSign, v, Ap_m2, Ar_m2)
+        Set SolveDamper = FinalizeSolveDamperResult(evaluation, cfg, Ap_m2, Ar_m2)
         Exit Function
     End If
 
     Dim iter As Long
     Dim converged As Boolean
-    Dim evaluation As Object
     For iter = 1 To MAX_ITER
         Set evaluation = EvaluateNetwork(unknownNames, unknownValues, nodes, fixedNodes, cfg, rho, mu, dirSign, v, Ap_m2, Ar_m2)
         Dim residual() As Double
@@ -171,6 +172,12 @@ Public Function SolveDamper(direction As String, v As Double, x As Double, topoN
     If Not converged Then
         Set evaluation = EvaluateNetwork(unknownNames, unknownValues, nodes, fixedNodes, cfg, rho, mu, dirSign, v, Ap_m2, Ar_m2)
     End If
+
+    Set SolveDamper = FinalizeSolveDamperResult(evaluation, cfg, Ap_m2, Ar_m2)
+End Function
+
+Private Function FinalizeSolveDamperResult(evaluation As Object, cfg As Object, Ap_m2 As Double, Ar_m2 As Double) As Object
+    If evaluation Is Nothing Then Exit Function
 
     Dim pressures As Object
     Set pressures = evaluation("Pressures")
@@ -225,7 +232,7 @@ Public Function SolveDamper(direction As String, v As Double, x As Double, topoN
     End If
     result("ShimLift") = shimLift_mm
 
-    SolveDamper = result
+    Set FinalizeSolveDamperResult = result
 End Function
 
 Public Sub RunSweep()
@@ -276,8 +283,12 @@ Public Sub RunSweep()
         Dim result As Variant
         result = SolveDamper(direction, Abs(v), travel, topology)
         If IsObject(result) Then
-            WriteResultRow resultsRange, rowIndex + 2, v, result
-            rowIndex = rowIndex + 1
+            If HasExpectedResultKeys(result) Then
+                WriteResultRow resultsRange, rowIndex + 2, v, result
+                rowIndex = rowIndex + 1
+            Else
+                Debug.Print "RunSweep skipped velocity " & Format$(v, "0.###") & " due to missing result fields."
+            End If
         End If
     Next i
 
@@ -481,10 +492,17 @@ Private Function EvaluateNetwork(unknownNames() As String, unknownValues() As Do
         pressures(key) = nodes(key)
     Next key
 
+    Dim lbUnknown As Long
+    Dim ubUnknown As Long
+    Dim hasUnknowns As Boolean
+    hasUnknowns = TryGetArrayBounds(unknownNames, lbUnknown, ubUnknown)
+
     Dim i As Long
-    For i = LBound(unknownNames) To UBound(unknownNames)
-        pressures(unknownNames(i)) = unknownValues(i)
-    Next i
+    If hasUnknowns Then
+        For i = lbUnknown To ubUnknown
+            pressures(unknownNames(i)) = unknownValues(i)
+        Next i
+    End If
 
     For Each key In fixedNodes.Keys
         pressures(key) = fixedNodes(key)
@@ -523,14 +541,20 @@ Private Function EvaluateNetwork(unknownNames() As String, unknownValues() As Do
     AddFlow netFlow, "ChamberB", qB
 
     Dim residual() As Double
-    ReDim residual(LBound(unknownNames) To UBound(unknownNames))
-    For i = LBound(unknownNames) To UBound(unknownNames)
-        residual(i) = netFlow(unknownNames(i))
-    Next i
+    If hasUnknowns Then
+        ReDim residual(lbUnknown To ubUnknown)
+        For i = lbUnknown To ubUnknown
+            residual(i) = netFlow(unknownNames(i))
+        Next i
+    End If
 
     Dim result As Object
     Set result = CreateObject("Scripting.Dictionary")
-    result("Residual") = residual
+    If hasUnknowns Then
+        result("Residual") = residual
+    Else
+        result("Residual") = Array()
+    End If
     result("Pressures") = pressures
     result("Flows") = flows
     result("NetFlow") = netFlow
@@ -876,6 +900,25 @@ Private Sub ClearSummaryMetrics()
     ThisWorkbook.Worksheets("Solver").Range("H8:I12").Columns(2).ClearContents
 End Sub
 
+Private Function HasExpectedResultKeys(result As Object) As Boolean
+    Dim required As Variant
+    required = Array("Force", "DeltaP", "Losses", "CavitationMargin", "BleedFraction")
+
+    On Error GoTo MissingKey
+
+    Dim key As Variant
+    For Each key In required
+        If Not result.Exists(key) Then GoTo MissingKey
+    Next key
+
+    HasExpectedResultKeys = True
+    Exit Function
+
+MissingKey:
+    Err.Clear
+    HasExpectedResultKeys = False
+End Function
+
 Private Function CountPopulatedRows(rng As Range) As Long
     Dim r As Long
     For r = rng.Rows.Count To 1 Step -1
@@ -894,6 +937,18 @@ Private Sub AddFlow(bucket As Object, node As String, value As Double)
         bucket(node) = bucket(node) + value
     End If
 End Sub
+
+Private Function TryGetArrayBounds(arr As Variant, ByRef lb As Long, ByRef ub As Long) As Boolean
+    On Error GoTo Failed
+    lb = LBound(arr)
+    ub = UBound(arr)
+    TryGetArrayBounds = (ub >= lb)
+    Exit Function
+
+Failed:
+    Err.Clear
+    TryGetArrayBounds = False
+End Function
  
 EOF
 )
